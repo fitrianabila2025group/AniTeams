@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-RUN npm ci --ignore-scripts && npx prisma generate
+RUN npm ci --ignore-scripts && ./node_modules/.bin/prisma generate
 
 # ─── Build ───────────────────────────────────────────────
 FROM base AS builder
@@ -38,10 +38,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/prisma ./prisma
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node server.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --accept-data-loss && node server.js"]
