@@ -50,7 +50,6 @@ setTimeout(() => router.push('/'), 1500)
   }
 
   return (
-    <div className="h-screen w-screen bg-black overflow-hidden flex items-center justify-center px-4">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-md bg-zinc-900 p-6 rounded-2xl shadow-2xl space-y-4"
@@ -119,7 +118,14 @@ setTimeout(() => router.push('/'), 1500)
             />
           ) : type === 'login' ? 'Login' : 'Sign Up'}
         </button>
+
+        <p className="text-center text-sm text-gray-400 mt-2">
+          {type === 'login' ? (
+            <>Don't have an account?{' '}<a href="/signup" className="text-purple-400 hover:underline">Register</a></>
+          ) : (
+            <>Already have an account?{' '}<a href="/login" className="text-purple-400 hover:underline">Login</a></>
+          )}
+        </p>
       </form>
-    </div>
   )
 }

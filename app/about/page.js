@@ -1,3 +1,16 @@
+export const metadata = {
+  title: "About",
+  description:
+    "Learn more about AniTeams — a free anime streaming site made for fans, by a fan. No ads, no fees — just anime.",
+  alternates: {
+    canonical: "/about",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
 export default function AboutPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white p-6">

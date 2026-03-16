@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Cookies from 'js-cookie'
+import Link from 'next/link'
 
 export default function CommentSection({ id }) {
   const [comments, setComments] = useState([])
@@ -25,13 +26,10 @@ export default function CommentSection({ id }) {
 
       const data = await res.json()
       if (res.ok && data.success) {
-        console.log('Fetched user:', data.user)
         setUser(data.user)
-      } else {
-        console.error('Failed to load user:', data.error)
       }
     } catch (err) {
-      console.error('Fetch user error:', err)
+      // User fetch failed silently
     }
   }
 
@@ -39,7 +37,6 @@ export default function CommentSection({ id }) {
     const res = await fetch(`/api/comments/${id}`)
     const data = await res.json()
     if (data.success) {
-      console.log('Fetched comments:', data.comments)
       setComments(data.comments)
     }
   }
@@ -85,30 +82,41 @@ export default function CommentSection({ id }) {
 
   return (
     <div className="space-y-6 mt-8 text-white">
-      {/* Comment input */}
-      <div className="relative">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-           onKeyDown={(event) => {
-    if (event.key === 'Enter') postComment(event)
-  }}
-          placeholder="Add a comment..."
-          className="w-full bg-transparent border-0 border-b-2 border-purple-500 focus:outline-none focus:ring-0 text-white placeholder-gray-400 py-2"
-        />
-        <button
-          onClick={postComment}
-          disabled={!text.trim() || loading}
-          className="absolute right-0 top-0 text-sm text-purple-400 hover:text-purple-300 disabled:opacity-40"
-        >
-          Post
-        </button>
-      </div>
+      <h3 className="text-lg font-semibold">Comments</h3>
+
+      {/* Comment input or login prompt */}
+      {user ? (
+        <div className="relative">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') postComment(event)
+            }}
+            placeholder="Add a comment..."
+            className="w-full bg-transparent border-0 border-b-2 border-purple-500 focus:outline-none focus:ring-0 text-white placeholder-gray-400 py-2"
+          />
+          <button
+            onClick={postComment}
+            disabled={!text.trim() || loading}
+            className="absolute right-0 top-0 text-sm text-purple-400 hover:text-purple-300 disabled:opacity-40"
+          >
+            Post
+          </button>
+        </div>
+      ) : (
+        <div className="border border-zinc-700 rounded-lg p-4 text-center">
+          <p className="text-gray-400 text-sm">
+            You must be{' '}
+            <Link href="/login" className="text-purple-400 hover:underline">logged in</Link>
+            {' '}to post a comment.
+          </p>
+        </div>
+      )}
 
       {/* Comments */}
       <div className="space-y-4">
         {comments.map((c) => {
-          console.log('Rendering comment:', c)
           return (
             <div key={c.id} className="flex gap-3 items-start">
               <img
@@ -142,14 +150,16 @@ export default function CommentSection({ id }) {
                   >
                     👎 ({c.dislikes?.length || 0})
                   </motion.button>
-                  <button
-                    onClick={() =>
-                      setReplyingTo((prev) => (prev === c.id ? null : c.id))
-                    }
-                    className="hover:text-purple-400"
-                  >
-                    Reply
-                  </button>
+                  {user && (
+                    <button
+                      onClick={() =>
+                        setReplyingTo((prev) => (prev === c.id ? null : c.id))
+                      }
+                      className="hover:text-purple-400"
+                    >
+                      Reply
+                    </button>
+                  )}
                 </div>
 
                 {/* Reply input */}
@@ -185,7 +195,6 @@ export default function CommentSection({ id }) {
                 {/* Replies */}
                 <div className="mt-4 space-y-4 ml-10">
                   {c.replies?.map((r) => {
-                    console.log('Rendering reply:', r)
                     return (
                       <div key={r.id} className="flex gap-3 items-start">
                         <img

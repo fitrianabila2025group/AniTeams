@@ -5,7 +5,10 @@ import { cookies } from 'next/headers'
 export async function POST(req, { params }) {
   try {
     const { commentId, type } = await req.json()
-    const { id } = params
+    const { id: animeSlug } = params
+    const { searchParams } = new URL(req.url)
+    const episodeId = searchParams.get('ep')
+    const formattedId = animeSlug && episodeId ? `${animeSlug}?ep=${episodeId}` : animeSlug
 
     const cookieStore = cookies()
     const uid = cookieStore.get('uid')?.value
@@ -18,8 +21,23 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: 'Invalid reaction type' }, { status: 400 })
     }
 
-    const commentRef = db.collection('comments').doc(id).collection('items').doc(commentId)
-    const commentSnap = await commentRef.get()
+    // Try thread-level comment first, then check replies
+    let commentRef = db.collection('comments').doc(formattedId).collection('threads').doc(commentId)
+    let commentSnap = await commentRef.get()
+
+    // If not found at thread level, search in replies subcollections
+    if (!commentSnap.exists) {
+      const threadsSnap = await db.collection('comments').doc(formattedId).collection('threads').get()
+      for (const threadDoc of threadsSnap.docs) {
+        const replyRef = threadDoc.ref.collection('replies').doc(commentId)
+        const replySnap = await replyRef.get()
+        if (replySnap.exists) {
+          commentRef = replyRef
+          commentSnap = replySnap
+          break
+        }
+      }
+    }
 
     if (!commentSnap.exists) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
