@@ -229,21 +229,3 @@ export function WatchButton({ titles }: WatchButtonProps) {
     </Button>
   );
 }
-                onClick={() => setShowPicker(false)}
-              >
-                {r.name}
-                {r.episodes && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    (Sub: {r.episodes.sub}, Dub: {r.episodes.dub})
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return null;
-}
