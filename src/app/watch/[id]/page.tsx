@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { WatchPlayer } from "@/components/watch/watch-player";
-import { CommentSection } from "@/components/comment-section";
+import { WatchPageClient } from "@/components/watch/watch-page-client";
 import { hiAnimeGetInfo } from "@/providers/hianime";
 import { auth } from "@/lib/auth";
 
@@ -54,19 +53,15 @@ export default async function WatchPage({ params, searchParams }: WatchPageProps
           </div>
         }
       >
-        <WatchPlayer
+        <WatchPageClient
           animeId={id}
           animeTitle={animeTitle}
           initialEpisodeId={ep}
           poster={poster}
+          anilistId={anilistId}
+          isLoggedIn={!!session?.user}
         />
       </Suspense>
-
-      {anilistId && (
-        <div className="mt-8">
-          <CommentSection anilistId={anilistId} isLoggedIn={!!session?.user} />
-        </div>
-      )}
     </div>
   );
 }

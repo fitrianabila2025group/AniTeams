@@ -124,12 +124,18 @@ export class AniListProvider implements AnimeMetadataProvider {
       ${DETAIL_FRAGMENT}
     `;
 
-    try {
-      const data = await anilistQuery<{ Media: AnimeMedia }>(query, { id });
-      return data.Media;
-    } catch {
-      return null;
+    // Retry once on transient failure
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const data = await anilistQuery<{ Media: AnimeMedia }>(query, { id });
+        return data.Media;
+      } catch {
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
     }
+    return null;
   }
 
   async getTrending(page = 1, perPage = 20): Promise<AnimeSearchResult> {

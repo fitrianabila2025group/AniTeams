@@ -31,6 +31,7 @@ interface WatchPlayerProps {
   animeTitle: string;
   initialEpisodeId?: string;
   poster?: string;
+  onEpisodeChange?: (episodeNumber: number) => void;
 }
 
 export function WatchPlayer({
@@ -38,6 +39,7 @@ export function WatchPlayer({
   animeTitle,
   initialEpisodeId,
   poster,
+  onEpisodeChange,
 }: WatchPlayerProps) {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
@@ -74,11 +76,13 @@ export function WatchPlayer({
           const found = eps.find((e: Episode) => e.episodeId === initialEpisodeId);
           if (found) {
             setCurrentEpisode(found);
+            onEpisodeChange?.(found.number);
             return;
           }
         }
         if (eps.length > 0) {
           setCurrentEpisode(eps[0]);
+          onEpisodeChange?.(eps[0].number);
         }
       })
       .catch((err) => {
@@ -194,7 +198,8 @@ export function WatchPlayer({
   const handleEpisodeSelect = useCallback((ep: Episode) => {
     setCurrentEpisode(ep);
     setError(null);
-  }, []);
+    onEpisodeChange?.(ep.number);
+  }, [onEpisodeChange]);
 
   const referer = sources?.headers?.Referer;
 

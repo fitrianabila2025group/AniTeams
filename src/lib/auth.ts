@@ -72,6 +72,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as Role;
+
+        // Refresh image from DB so avatar updates are reflected immediately
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: token.id as string },
+            select: { image: true, name: true },
+          });
+          if (dbUser) {
+            session.user.image = dbUser.image;
+            if (dbUser.name) session.user.name = dbUser.name;
+          }
+        } catch {
+          // DB lookup failed, keep token values
+        }
       }
       return session;
     },

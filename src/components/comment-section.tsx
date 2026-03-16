@@ -12,10 +12,11 @@ import Link from "next/link";
 
 interface CommentSectionProps {
   anilistId: number;
+  episode?: number | null;
   isLoggedIn?: boolean;
 }
 
-export function CommentSection({ anilistId, isLoggedIn = false }: CommentSectionProps) {
+export function CommentSection({ anilistId, episode, isLoggedIn = false }: CommentSectionProps) {
   const [comments, setComments] = useState<CommentData[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -24,17 +25,20 @@ export function CommentSection({ anilistId, isLoggedIn = false }: CommentSection
 
   const loadComments = useCallback(async () => {
     try {
-      const result = await getComments(anilistId, null, page);
+      const result = await getComments(anilistId, episode ?? null, page);
       setComments(result.comments);
       setTotal(result.total);
     } catch {
       // Not available
     }
-  }, [anilistId, page]);
+  }, [anilistId, episode, page]);
 
   useEffect(() => {
+    setComments([]);
+    setTotal(0);
+    setPage(1);
     loadComments();
-  }, [loadComments]);
+  }, [anilistId, episode, loadComments]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +49,7 @@ export function CommentSection({ anilistId, isLoggedIn = false }: CommentSection
         const comment = await createComment({
           animeAnilistId: anilistId,
           content: newComment.trim(),
+          episode: episode ?? undefined,
         });
         setComments((prev) => [comment, ...prev]);
         setTotal((t) => t + 1);
@@ -185,6 +190,24 @@ function CommentItem({ comment, anilistId, isLoggedIn, onDelete }: CommentItemPr
   }
 
   function handleReaction(emoji: string) {
+    // Optimistic update
+    const existingIdx = comment.reactions.findIndex((r) => r.emoji === emoji);
+    const updatedReactions = [...comment.reactions];
+    if (existingIdx >= 0) {
+      const existing = updatedReactions[existingIdx];
+      if (existing.userReacted) {
+        existing.count -= 1;
+        existing.userReacted = false;
+        if (existing.count <= 0) updatedReactions.splice(existingIdx, 1);
+      } else {
+        existing.count += 1;
+        existing.userReacted = true;
+      }
+    } else {
+      updatedReactions.push({ emoji, count: 1, userReacted: true });
+    }
+    comment.reactions = updatedReactions;
+
     startTransition(async () => {
       await toggleReaction({ commentId: comment.id, emoji });
     });
