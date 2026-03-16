@@ -1,0 +1,348 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum WatchStatus {
+  WATCHING
+  COMPLETED
+  PLANNING
+  DROPPED
+  ON_HOLD
+}
+
+enum MediaFormat {
+  TV
+  TV_SHORT
+  MOVIE
+  SPECIAL
+  OVA
+  ONA
+  MUSIC
+}
+
+enum MediaStatus {
+  RELEASING
+  FINISHED
+  NOT_YET_RELEASED
+  CANCELLED
+  HIATUS
+}
+
+enum Season {
+  WINTER
+  SPRING
+  SUMMER
+  FALL
+}
+
+enum NotificationType {
+  NEW_EPISODE
+  COMMENT_REPLY
+  WATCHLIST_UPDATE
+  SYSTEM
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  UPDATE_PROFILE
+  UPDATE_WATCHLIST
+  DELETE_COMMENT
+  MODERATE_COMMENT
+  ADMIN_ACTION
+}
+
+// ─── Auth.js required models ────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  hashedPassword String?
+  image          String?
+  bio            String?   @db.Text
+  role           Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  watchlistEntries WatchlistEntry[]
+  progressEntries  ProgressEntry[]
+  comments         Comment[]
+  commentReactions CommentReaction[]
+  notifications    Notification[]
+  settings         UserSettings?
+  anilistConnection AniListConnection?
+  auditLogs        AuditLog[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Anime metadata (cached from provider) ──────────────
+
+model Anime {
+  id             String       @id @default(cuid())
+  anilistId      Int          @unique
+  malId          Int?
+  title          String
+  titleEnglish   String?
+  titleNative    String?
+  description    String?      @db.Text
+  coverImage     String?
+  bannerImage    String?
+  format         MediaFormat?
+  status         MediaStatus?
+  season         Season?
+  seasonYear     Int?
+  episodes       Int?
+  duration       Int?
+  averageScore   Int?
+  popularity     Int?
+  genres         String[]
+  studios        String[]
+  source         String?
+  trailer        String?
+  startDate      DateTime?
+  endDate        DateTime?
+  isAdult        Boolean      @default(false)
+  updatedAt      DateTime     @updatedAt
+  cachedAt       DateTime     @default(now())
+
+  externalMappings  AnimeExternalMapping[]
+  watchlistEntries  WatchlistEntry[]
+  progressEntries   ProgressEntry[]
+  comments          Comment[]
+  availability      ProviderAvailability[]
+
+  @@index([anilistId])
+  @@index([malId])
+  @@index([status])
+  @@index([season, seasonYear])
+  @@index([averageScore])
+  @@index([popularity])
+}
+
+model AnimeExternalMapping {
+  id         String @id @default(cuid())
+  animeId    String
+  provider   String
+  externalId String
+
+  anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([animeId, provider])
+  @@index([provider, externalId])
+}
+
+// ─── Watchlist ──────────────────────────────────────────
+
+model WatchlistEntry {
+  id        String      @id @default(cuid())
+  userId    String
+  animeId   String
+  status    WatchStatus
+  score     Int?
+  notes     String?     @db.Text
+  addedAt   DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@index([userId, status])
+  @@index([animeId])
+}
+
+// ─── Progress Tracking ─────────────────────────────────
+
+model ProgressEntry {
+  id              String   @id @default(cuid())
+  userId          String
+  animeId         String
+  currentEpisode  Int      @default(0)
+  lastWatchedAt   DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@index([userId, lastWatchedAt(sort: Desc)])
+  @@index([animeId])
+}
+
+// ─── Comments ───────────────────────────────────────────
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  animeId   String
+  episode   Int?
+  parentId  String?
+  content   String   @db.Text
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime     Anime            @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  parent    Comment?         @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[]        @relation("CommentReplies")
+  reactions CommentReaction[]
+
+  @@index([animeId, episode])
+  @@index([userId])
+  @@index([parentId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model CommentReaction {
+  id        String @id @default(cuid())
+  userId    String
+  commentId String
+  emoji     String @db.VarChar(8)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId, emoji])
+  @@index([commentId])
+}
+
+// ─── Notifications ──────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ─── User Settings ──────────────────────────────────────
+
+model UserSettings {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  emailNotifications    Boolean @default(true)
+  episodeNotifications  Boolean @default(true)
+  publicProfile         Boolean @default(true)
+  preferredLanguage     String  @default("en")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── AniList Connection ─────────────────────────────────
+
+model AniListConnection {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  anilistId     Int
+  accessToken   String   @db.Text
+  tokenExpires  DateTime?
+  syncEnabled   Boolean  @default(true)
+  lastSyncAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([anilistId])
+}
+
+// ─── Provider Availability ──────────────────────────────
+
+model ProviderAvailability {
+  id         String   @id @default(cuid())
+  animeId    String
+  provider   String
+  url        String?
+  region     String?  @db.VarChar(5)
+  available  Boolean  @default(true)
+  checkedAt  DateTime @default(now())
+
+  anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([animeId, provider, region])
+  @@index([provider])
+}
+
+// ─── Audit Log ──────────────────────────────────────────
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String?
+  action    AuditAction
+  details   String?     @db.Text
+  ipAddress String?     @db.VarChar(45)
+  createdAt DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+}
